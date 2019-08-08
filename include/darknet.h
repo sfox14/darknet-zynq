@@ -657,6 +657,7 @@ void rgbgr_image(image im);
 data copy_data(data d);
 data concat_data(data d1, data d2);
 data load_cifar10_data(char *filename);
+data load_rf_data(char *filename);
 float matrix_topk_accuracy(matrix truth, matrix guess, int k);
 void matrix_add_matrix(matrix from, matrix to);
 void scale_matrix(matrix m, float scale);

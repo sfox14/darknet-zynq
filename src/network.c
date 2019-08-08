@@ -316,7 +316,7 @@ float train_network(network *net, data d)
     assert(d.X.rows % net->batch == 0);
     int batch = net->batch;
     int n = d.X.rows / batch;
-
+    
     int i;
     float sum = 0;
     for(i = 0; i < n; ++i){
