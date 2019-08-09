@@ -29,8 +29,12 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
 
         epoch = *net->seen/N;
 
+        // apply stochastic weight averaging (make it standalone)
         if (get_current_batch(net)>(net->swa_start)){
-            update_swa_network(net); // stochastic weight average
+            net->policy = CONSTANT;
+            net->learning_rate = net->swa_lr;
+
+            update_swa_network(net);
             net->swa_n += 1;
         }
 
@@ -47,8 +51,6 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
             sprintf(buff, "%s/%s.backup",backup_directory,base);
             save_weights(net, buff);
         }
-
-        
 
     }
     char buff[256];
