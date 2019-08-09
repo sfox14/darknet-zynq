@@ -199,7 +199,7 @@ convolutional_layer parse_convolutional(list *options, size_params params)
     int binary = option_find_int_quiet(options, "binary", 0);
     int xnor = option_find_int_quiet(options, "xnor", 0);
 
-    convolutional_layer layer = make_convolutional_layer(batch,h,w,c,n,groups,size,stride,padding,activation, batch_normalize, binary, xnor, params.net->adam);
+    convolutional_layer layer = make_convolutional_layer(batch,h,w,c,n,groups,size,stride,padding,activation, batch_normalize, binary, xnor, params.net->adam, params.net->swa);
     layer.flipped = option_find_int_quiet(options, "flipped", 0);
     layer.dot = option_find_float_quiet(options, "dot", 0);
 
@@ -263,7 +263,7 @@ layer parse_connected(list *options, size_params params)
     ACTIVATION activation = get_activation(activation_s);
     int batch_normalize = option_find_int_quiet(options, "batch_normalize", 0);
 
-    layer l = make_connected_layer(params.batch, params.inputs, output, activation, batch_normalize, params.net->adam);
+    layer l = make_connected_layer(params.batch, params.inputs, output, activation, batch_normalize, params.net->adam, params.net->swa);
     return l;
 }
 
@@ -982,6 +982,7 @@ void save_convolutional_weights(layer l, FILE *fp)
         fwrite(l.rolling_variance, sizeof(float), l.n, fp);
     }
     fwrite(l.weights, sizeof(float), num, fp);
+    if(l.swa) fwrite(l.weights_swa, sizeof(float), num, fp);
 }
 
 void save_batchnorm_weights(layer l, FILE *fp)
@@ -1005,7 +1006,7 @@ void save_connected_weights(layer l, FILE *fp)
 #endif
     fwrite(l.biases, sizeof(float), l.outputs, fp);
     fwrite(l.weights, sizeof(float), l.outputs*l.inputs, fp);
-    fwrite(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
+    if(l.swa) fwrite(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
     if (l.batch_normalize){
         fwrite(l.scales, sizeof(float), l.outputs, fp);
         fwrite(l.rolling_mean, sizeof(float), l.outputs, fp);
@@ -1108,10 +1109,10 @@ void load_connected_weights(layer l, FILE *fp, int transpose)
 {
     fread(l.biases, sizeof(float), l.outputs, fp);
     fread(l.weights, sizeof(float), l.outputs*l.inputs, fp);
-    fread(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
+    if(l.swa) fread(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
     if(transpose){
         transpose_matrix(l.weights, l.inputs, l.outputs);
-        transpose_matrix(l.weights_swa, l.inputs, l.outputs);
+        if(l.swa) transpose_matrix(l.weights_swa, l.inputs, l.outputs);
     }
     //printf("Biases: %f mean %f variance\n", mean_array(l.biases, l.outputs), variance_array(l.biases, l.outputs));
     //printf("Weights: %f mean %f variance\n", mean_array(l.weights, l.outputs*l.inputs), variance_array(l.weights, l.outputs*l.inputs));
@@ -1213,9 +1214,11 @@ void load_convolutional_weights(layer l, FILE *fp)
         }
     }
     fread(l.weights, sizeof(float), num, fp);
+    if(l.swa) fread(l.weights_swa, sizeof(float), num, fp);
     //if(l.c == 3) scal_cpu(num, 1./256, l.weights, 1);
     if (l.flipped) {
         transpose_matrix(l.weights, l.c*l.size*l.size, l.n);
+        if(l.swa) transpose_matrix(l.weights_swa, l.c*l.size*l.size, l.n);
     }
     //if (l.binary) binarize_weights(l.weights, l.n, l.c*l.size*l.size, l.weights);
 #ifdef GPU

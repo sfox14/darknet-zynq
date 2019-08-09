@@ -38,34 +38,34 @@ layer make_gru_layer(int batch, int inputs, int outputs, int steps, int batch_no
 
     l.uz = malloc(sizeof(layer));
     fprintf(stderr, "\t\t");
-    *(l.uz) = make_connected_layer(batch*steps, inputs, outputs, LINEAR, batch_normalize, adam);
+    *(l.uz) = make_connected_layer(batch*steps, inputs, outputs, LINEAR, batch_normalize, adam, 0);
     l.uz->batch = batch;
 
     l.wz = malloc(sizeof(layer));
     fprintf(stderr, "\t\t");
-    *(l.wz) = make_connected_layer(batch*steps, outputs, outputs, LINEAR, batch_normalize, adam);
+    *(l.wz) = make_connected_layer(batch*steps, outputs, outputs, LINEAR, batch_normalize, adam, 0);
     l.wz->batch = batch;
 
     l.ur = malloc(sizeof(layer));
     fprintf(stderr, "\t\t");
-    *(l.ur) = make_connected_layer(batch*steps, inputs, outputs, LINEAR, batch_normalize, adam);
+    *(l.ur) = make_connected_layer(batch*steps, inputs, outputs, LINEAR, batch_normalize, adam, 0);
     l.ur->batch = batch;
 
     l.wr = malloc(sizeof(layer));
     fprintf(stderr, "\t\t");
-    *(l.wr) = make_connected_layer(batch*steps, outputs, outputs, LINEAR, batch_normalize, adam);
+    *(l.wr) = make_connected_layer(batch*steps, outputs, outputs, LINEAR, batch_normalize, adam, 0);
     l.wr->batch = batch;
 
 
 
     l.uh = malloc(sizeof(layer));
     fprintf(stderr, "\t\t");
-    *(l.uh) = make_connected_layer(batch*steps, inputs, outputs, LINEAR, batch_normalize, adam);
+    *(l.uh) = make_connected_layer(batch*steps, inputs, outputs, LINEAR, batch_normalize, adam, 0);
     l.uh->batch = batch;
 
     l.wh = malloc(sizeof(layer));
     fprintf(stderr, "\t\t");
-    *(l.wh) = make_connected_layer(batch*steps, outputs, outputs, LINEAR, batch_normalize, adam);
+    *(l.wh) = make_connected_layer(batch*steps, outputs, outputs, LINEAR, batch_normalize, adam, 0);
     l.wh->batch = batch;
 
     l.batch_normalize = batch_normalize;

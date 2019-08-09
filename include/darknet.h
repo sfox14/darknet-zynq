@@ -180,6 +180,7 @@ struct layer{
     int tanh;
     int *mask;
     int total;
+    int swa;
 
     float alpha;
     float beta;

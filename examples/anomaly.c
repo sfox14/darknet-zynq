@@ -62,14 +62,16 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
 }
 
 
-void test_anomaly(char *cfgfile, char *filename, char *weightfile)
+void test_anomaly(char *cfgfile, char *filename, char *weightfile, char *swa)
 {
 
     network *net = load_network(cfgfile, weightfile, 0);
     net->batch = 400;
 
     // use swa weights
-    if(net->swa) network_copy_swa(net);
+    if(swa){
+       if(strcmp(swa, "swa")==0) network_copy_swa(net); 
+    } 
 
     srand(23); //srand(time(0));
 
@@ -100,15 +102,16 @@ void test_anomaly(char *cfgfile, char *filename, char *weightfile)
 void run_anomaly(int argc, char **argv)
 {
     if(argc < 4){
-        fprintf(stderr, "usage: %s %s [train/test] [cfg] [filename] [weights (optional)]\n", argv[0], argv[1]);
+        fprintf(stderr, "usage: %s %s [train/test] [cfg] [filename] [weights (optional)] [swa (optional)]\n", argv[0], argv[1]);
         return;
     }
 
     char *cfg = argv[3];
     char *filename = argv[4];
     char *weights = (argc > 5) ? argv[5] : 0;
+    char *swa = (argc > 6) ? argv[6] : 0;
     if(0==strcmp(argv[2], "train")) train_anomaly(cfg, filename, weights);
-    else if(0==strcmp(argv[2], "test")) test_anomaly(cfg, filename, weights);
+    else if(0==strcmp(argv[2], "test")) test_anomaly(cfg, filename, weights, swa);
 }
 
 

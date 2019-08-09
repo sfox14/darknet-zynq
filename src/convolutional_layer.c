@@ -173,11 +173,12 @@ void cudnn_convolutional_setup(layer *l)
 #endif
 #endif
 
-convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int n, int groups, int size, int stride, int padding, ACTIVATION activation, int batch_normalize, int binary, int xnor, int adam)
+convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int n, int groups, int size, int stride, int padding, ACTIVATION activation, int batch_normalize, int binary, int xnor, int adam, int swa)
 {
     int i;
     convolutional_layer l = {0};
     l.type = CONVOLUTIONAL;
+    l.swa = swa;
 
     l.groups = groups;
     l.h = h;
@@ -194,6 +195,8 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
 
     l.weights = calloc(c/groups*n*size*size, sizeof(float));
     l.weight_updates = calloc(c/groups*n*size*size, sizeof(float));
+
+    if(swa) l.weights_swa = calloc(c/groups*n*size*size, sizeof(float));
 
     l.biases = calloc(n, sizeof(float));
     l.bias_updates = calloc(n, sizeof(float));
@@ -221,6 +224,8 @@ convolutional_layer make_convolutional_layer(int batch, int h, int w, int c, int
     l.forward = forward_convolutional_layer;
     l.backward = backward_convolutional_layer;
     l.update = update_convolutional_layer;
+    if(swa) l.update_swa = update_swa_convolutional_layer;
+    
     if(binary){
         l.binary_weights = calloc(l.nweights, sizeof(float));
         l.cweights = calloc(l.nweights, sizeof(char));
@@ -553,6 +558,14 @@ void update_convolutional_layer(convolutional_layer l, update_args a)
     axpy_cpu(l.nweights, -decay*batch, l.weights, 1, l.weight_updates, 1);
     axpy_cpu(l.nweights, learning_rate/batch, l.weight_updates, 1, l.weights, 1);
     scal_cpu(l.nweights, momentum, l.weight_updates, 1);
+}
+
+void update_swa_convolutional_layer(layer l, update_args a)
+{
+    float n_alpha = 1 - a.alpha;
+
+    scal_cpu(l.nweights, n_alpha, l.weights_swa, 1);
+    axpy_cpu(l.nweights, a.alpha, l.weights, 1, l.weights_swa, 1);
 }
 
 

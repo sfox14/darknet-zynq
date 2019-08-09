@@ -11,12 +11,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activation, int batch_normalize, int adam)
+layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activation, int batch_normalize, int adam, int swa)
 {
     int i;
     layer l = {0};
     l.learning_rate_scale = 1;
     l.type = CONNECTED;
+    l.swa = swa;
 
     l.inputs = inputs;
     l.outputs = outputs;
@@ -38,12 +39,12 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
     l.weights = calloc(outputs*inputs, sizeof(float));
     l.biases = calloc(outputs, sizeof(float));
 
-    l.weights_swa = calloc(outputs*inputs, sizeof(float));
+    if(swa) l.weights_swa = calloc(outputs*inputs, sizeof(float));
 
     l.forward = forward_connected_layer;
     l.backward = backward_connected_layer;
     l.update = update_connected_layer;
-    l.update_swa = update_swa_connected_layer;
+    if(swa) l.update_swa = update_swa_connected_layer;
 
     //float scale = 1./sqrt(inputs);
     float scale = sqrt(2./inputs);
