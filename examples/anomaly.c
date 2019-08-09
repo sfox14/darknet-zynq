@@ -29,6 +29,11 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
 
         epoch = *net->seen/N;
 
+        if (get_current_batch(net)>(net->swa_start)){
+            update_swa_network(net); // stochastic weight average
+            net->swa_n += 1;
+        }
+
         if(epoch%100 == 0){
             printf("%ld: %f, %f avg, %f rate, %lf seconds, %ld windows\n", get_current_batch(net), loss, avg_loss, get_current_rate(net), sec(clock()-time), *net->seen);
         }
@@ -60,21 +65,36 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
 void test_anomaly(char *cfgfile, char *filename, char *weightfile)
 {
 
-    //network *net = load_network(cfgfile, weightfile, 0);
-    //srand(time(0));
+    network *net = load_network(cfgfile, weightfile, 0);
+    net->batch = 400;
 
-    //clock_t time;
+    // use swa weights
+    if(net->swa) network_copy_swa(net);
+
+    srand(23); //srand(time(0));
+
+    clock_t time;
     //float avg_acc = 0;
     //float avg_top5 = 0;
-    //data test = load_cifar10_data("data/cifar/cifar-10-batches-bin/test_batch.bin");
+    data test = load_rf_test(filename);
 
-    //time=clock();
+    time=clock();
 
-    //float *acc = network_accuracies(net, test, 2);
-    //avg_acc += acc[0];
-    //avg_top5 += acc[1];
-    //printf("top1: %f, %lf seconds, %d images\n", avg_acc, sec(clock()-time), test.X.rows);
-    //free_data(test);
+    matrix out = network_predict_data(net, test);
+    
+    for (int i=0; i<400; i++){
+        float sse = 0;
+        for (int j=0; j<32; j++){
+            float err = (out.vals[i][j] - test.X.vals[i][j]);
+            float sqerr = err*err;
+            sse += sqerr;
+        }
+        int label = (int)(test.y.vals[i][0]);
+        printf("[%d], sse=%f, %d\n", i, sse, label);
+    }
+
+
+    free_data(test);
 }
 
 void run_anomaly(int argc, char **argv)

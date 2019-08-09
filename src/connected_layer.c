@@ -38,9 +38,12 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
     l.weights = calloc(outputs*inputs, sizeof(float));
     l.biases = calloc(outputs, sizeof(float));
 
+    l.weights_swa = calloc(outputs*inputs, sizeof(float));
+
     l.forward = forward_connected_layer;
     l.backward = backward_connected_layer;
     l.update = update_connected_layer;
+    l.update_swa = update_swa_connected_layer;
 
     //float scale = 1./sqrt(inputs);
     float scale = sqrt(2./inputs);
@@ -128,6 +131,16 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
     fprintf(stderr, "connected                            %4d  ->  %4d\n", inputs, outputs);
     return l;
 }
+
+
+void update_swa_connected_layer(layer l, update_args a)
+{
+    float n_alpha = 1 - a.alpha;
+
+    scal_cpu(l.inputs*l.outputs, n_alpha, l.weights_swa, 1);
+    axpy_cpu(l.inputs*l.outputs, a.alpha, l.weights, 1, l.weights_swa, 1);
+}
+
 
 void update_connected_layer(layer l, update_args a)
 {

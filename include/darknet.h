@@ -104,6 +104,8 @@ typedef struct{
     float B2;
     float eps;
     int t;
+    float alpha;
+
 } update_args;
 
 struct network;
@@ -119,6 +121,7 @@ struct layer{
     void (*forward)   (struct layer, struct network);
     void (*backward)  (struct layer, struct network);
     void (*update)    (struct layer, update_args);
+    void (*update_swa)    (struct layer, update_args);
     void (*forward_gpu)   (struct layer, struct network);
     void (*backward_gpu)  (struct layer, struct network);
     void (*update_gpu)    (struct layer, update_args);
@@ -237,6 +240,7 @@ struct layer{
 
     float * weights;
     float * weight_updates;
+    float * weights_swa;
 
     float * delta;
     float * output;
@@ -452,6 +456,11 @@ typedef struct network{
     int num_steps;
     int burn_in;
 
+    int swa;
+    int swa_start;
+    int swa_n;
+    float swa_lr;
+
     int adam;
     float B1;
     float B2;
@@ -612,7 +621,9 @@ data select_data(data *orig, int *inds);
 void forward_network(network *net);
 void backward_network(network *net);
 void update_network(network *net);
+void update_swa_network(network *net);
 
+void network_copy_swa(network *net);
 
 float dot_cpu(int N, float *X, int INCX, float *Y, int INCY);
 void axpy_cpu(int N, float ALPHA, float *X, int INCX, float *Y, int INCY);
@@ -658,6 +669,7 @@ data copy_data(data d);
 data concat_data(data d1, data d2);
 data load_cifar10_data(char *filename);
 data load_rf_data(char *filename);
+data load_rf_test(char *filename);
 float matrix_topk_accuracy(matrix truth, matrix guess, int k);
 void matrix_add_matrix(matrix from, matrix to);
 void scale_matrix(matrix m, float scale);
@@ -789,6 +801,7 @@ int sample_array(float *a, int n);
 int *random_index_order(int min, int max);
 void free_list(list *l);
 float mse_array(float *a, int n);
+float rmse_array(float *a, float *b, int n);
 float variance_array(float *a, int n);
 float mag_array(float *a, int n);
 void scale_array(float *a, int n, float s);

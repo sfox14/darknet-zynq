@@ -93,6 +93,7 @@ float get_current_rate(network *net)
     int i;
     float rate;
     if (batch_num < net->burn_in) return net->learning_rate * pow((float)batch_num / net->burn_in, net->power);
+    if (net->swa && batch_num>=net->swa_start) return net->swa_lr;
     switch (net->policy) {
         case CONSTANT:
             return net->learning_rate;
@@ -240,6 +241,28 @@ void update_network(network *netp)
     }
 }
 
+void update_swa_network(network *netp)
+{
+//#ifdef GPU
+//    if(netp->gpu_index >= 0){
+//        update_network_gpu(netp);   
+//        return;
+//    }
+//#endif
+    network net = *netp;
+    int i;
+    update_args a = {0};
+    a.alpha = 1.0/(1.0 + net.swa_n);
+
+    for(i = 0; i < net.n; ++i){
+        layer l = net.layers[i];
+        if(l.update_swa){
+            l.update_swa(l, a);
+        }
+    }
+}
+
+
 void calc_network_cost(network *netp)
 {
     network net = *netp;
@@ -316,7 +339,7 @@ float train_network(network *net, data d)
     assert(d.X.rows % net->batch == 0);
     int batch = net->batch;
     int n = d.X.rows / batch;
-    
+
     int i;
     float sum = 0;
     for(i = 0; i < n; ++i){
@@ -728,6 +751,24 @@ void free_network(network *net)
 #endif
     free(net);
 }
+
+void network_copy_swa(network *netp)
+{
+    network net = *netp;
+    int i; 
+
+    for(i = 0; i < net.n; ++i){
+        layer l = net.layers[i];
+        if(l.weights_swa){
+            if (l.type == CONNECTED){
+                copy_cpu(l.inputs*l.outputs, l.weights_swa, 1, l.weights, 1);
+            }else if (l.type == CONVOLUTIONAL){
+                copy_cpu(l.nweights, l.weights_swa, 1, l.weights, 1);
+            }
+        }
+    }
+}
+
 
 // Some day...
 // ^ What the hell is this comment for?

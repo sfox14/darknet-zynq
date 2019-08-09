@@ -673,6 +673,14 @@ void parse_net_options(list *options, network *net)
         net->eps = option_find_float(options, "eps", .0000001);
     }
 
+    net->swa = option_find_int_quiet(options, "swa", 0);
+    if(net->swa){
+        net->swa_lr = option_find_float(options, "swa_lr", 0.01);
+        net->swa_start = option_find_int_quiet(options, "swa_start", 50000);
+        net->swa_n = option_find_int_quiet(options, "swa_n", 0);
+    }
+
+
     net->h = option_find_int_quiet(options, "height",0);
     net->w = option_find_int_quiet(options, "width",0);
     net->c = option_find_int_quiet(options, "channels",0);
@@ -997,6 +1005,7 @@ void save_connected_weights(layer l, FILE *fp)
 #endif
     fwrite(l.biases, sizeof(float), l.outputs, fp);
     fwrite(l.weights, sizeof(float), l.outputs*l.inputs, fp);
+    fwrite(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
     if (l.batch_normalize){
         fwrite(l.scales, sizeof(float), l.outputs, fp);
         fwrite(l.rolling_mean, sizeof(float), l.outputs, fp);
@@ -1099,8 +1108,10 @@ void load_connected_weights(layer l, FILE *fp, int transpose)
 {
     fread(l.biases, sizeof(float), l.outputs, fp);
     fread(l.weights, sizeof(float), l.outputs*l.inputs, fp);
+    fread(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
     if(transpose){
         transpose_matrix(l.weights, l.inputs, l.outputs);
+        transpose_matrix(l.weights_swa, l.inputs, l.outputs);
     }
     //printf("Biases: %f mean %f variance\n", mean_array(l.biases, l.outputs), variance_array(l.biases, l.outputs));
     //printf("Weights: %f mean %f variance\n", mean_array(l.weights, l.outputs*l.inputs), variance_array(l.weights, l.outputs*l.inputs));

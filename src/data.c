@@ -1446,6 +1446,31 @@ data load_cifar10_data(char *filename)
     return d;
 }
 
+data load_rf_test(char *filename)
+{
+    data d = {0};
+    d.shallow = 0;
+    long i,j;
+    matrix X = make_matrix(400, 32);
+    matrix y = make_matrix(400, 1);
+    d.X = X;
+    d.y = y;
+
+    FILE *fp = fopen(filename, "rb");
+    if(!fp) file_error(filename);
+    for(i = 0; i < 400; ++i){
+        double bytes[33];
+        fread(bytes, 8, 33, fp);
+        y.vals[i][0] = (float)(bytes[32]);
+        for(j = 0; j < X.cols; ++j){
+            X.vals[i][j] = (float)(bytes[j]);
+            //y.vals[i][j] = (float)(bytes[j]);
+        }
+    }
+    fclose(fp);
+    return d;
+}
+
 data load_rf_data(char *filename)
 {
     data d = {0};
@@ -1469,6 +1494,8 @@ data load_rf_data(char *filename)
     fclose(fp);
     return d;
 }
+
+
 
 void get_random_batch(data d, int n, float *X, float *y)
 {
