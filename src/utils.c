@@ -551,6 +551,17 @@ float mse_array(float *a, int n)
     return sqrt(sum/n);
 }
 
+float rmse_array(float *a, float *b, int n)
+{
+    int i;
+    float rmse = 0;
+    for(i=0; i<n; ++i){
+        float err = a[i]-b[i];
+        rmse += err*err;
+    }
+    return sqrt(rmse);
+}
+
 void normalize_array(float *a, int n)
 {
     int i;
