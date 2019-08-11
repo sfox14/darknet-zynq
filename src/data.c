@@ -1471,6 +1471,7 @@ data load_rf_test(char *filename)
     return d;
 }
 
+
 data load_rf_data(char *filename)
 {
     data d = {0};
@@ -1491,9 +1492,12 @@ data load_rf_data(char *filename)
             y.vals[i][j] = (float)(bytes[j]);
         }
     }
+
     fclose(fp);
     return d;
 }
+
+
 
 
 

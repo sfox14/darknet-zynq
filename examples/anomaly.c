@@ -57,7 +57,6 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
     sprintf(buff, "%s/%s.weights", backup_directory, base);
     save_weights(net, buff);
     
-
     free_network(net);
     free(base);
     free_data(train);
@@ -68,7 +67,7 @@ void test_anomaly(char *cfgfile, char *filename, char *weightfile, char *swa)
 {
 
     network *net = load_network(cfgfile, weightfile, 0);
-    net->batch = 400;
+    //net->batch = 400;
 
     // use swa weights
     if(swa){

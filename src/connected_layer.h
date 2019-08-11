@@ -8,10 +8,10 @@
 layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activation, int batch_normalize, int adam, int swa);
 void update_swa_connected_layer(layer l, update_args a);
 
-#ifdef FPGA
-void forward_connected_layer_fpga(layer l, network net);
-void backward_connected_layer_fpga(layer l, network net);
-void update_connected_layer_fpga(layer l, update_args a);
+#ifdef LOWP
+void forward_connected_layer_lowp(layer l, network net);
+void backward_connected_layer_lowp(layer l, network net);
+void update_connected_layer_lowp(layer l, update_args a);
 #else
 void forward_connected_layer(layer l, network net);
 void backward_connected_layer(layer l, network net);

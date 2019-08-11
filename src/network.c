@@ -6,6 +6,7 @@
 #include "data.h"
 #include "utils.h"
 #include "blas.h"
+#include "quant.h"
 
 #include "crop_layer.h"
 #include "connected_layer.h"
@@ -232,6 +233,7 @@ void update_network(network *netp)
     a.eps = net.eps;
     ++*net.t;
     a.t = *net.t;
+    a.workspace = net.workspace; //net.workspace;
 
     for(i = 0; i < net.n; ++i){
         layer l = net.layers[i];
@@ -253,6 +255,7 @@ void update_swa_network(network *netp)
     int i;
     update_args a = {0};
     a.alpha = 1.0/(1.0 + net.swa_n);
+    a.workspace = net.workspace;
 
     for(i = 0; i < net.n; ++i){
         layer l = net.layers[i];
@@ -261,7 +264,6 @@ void update_swa_network(network *netp)
         }
     }
 }
-
 
 void calc_network_cost(network *netp)
 {
@@ -760,11 +762,22 @@ void network_copy_swa(network *netp)
     for(i = 0; i < net.n; ++i){
         layer l = net.layers[i];
         if(l.weights_swa){
+
+#ifdef LOWP
+            if (l.type == CONNECTED){
+                copy_cpu(l.inputs*l.outputs, l.weights_swa, 1, net.workspace, 1);
+                quantize_with_update(net.workspace, l.weights, l.inputs*l.outputs, l.qw);
+            }else if (l.type == CONVOLUTIONAL){
+                copy_cpu(l.nweights, l.weights_swa, 1, net.workspace, 1);
+                quantize_with_update(net.workspace, l.weights, l.nweights, l.qw);
+            }
+#else
             if (l.type == CONNECTED){
                 copy_cpu(l.inputs*l.outputs, l.weights_swa, 1, l.weights, 1);
             }else if (l.type == CONVOLUTIONAL){
                 copy_cpu(l.nweights, l.weights_swa, 1, l.weights, 1);
             }
+#endif        
         }
     }
 }

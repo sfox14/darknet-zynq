@@ -5,6 +5,7 @@
 #include "cuda.h"
 #include "blas.h"
 #include "gemm.h"
+#include "quant.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -25,7 +26,7 @@ void gemm_fixed(int8_t *A, int arow, int8_t *B, int brow, int *C, int ccol)
           C[i*arow+j] = result;
         }
     }
-    
+
 }
 
 layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activation, int batch_normalize, int adam, int swa)
@@ -53,15 +54,27 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
     l.weight_updates = calloc(inputs*outputs, sizeof(float));
     l.bias_updates = calloc(outputs, sizeof(float));
 
+#ifdef LOWP
+    l.weights = calloc(outputs*inputs, sizeof(int8_t));
+    l.input = calloc(batch*inputs, sizeof(int8_t));
+    l.qw = (quant *) malloc( sizeof(quant) );
+    l.qa = (quant *) malloc( sizeof(quant) );
+    l.qe = (quant *) malloc( sizeof(quant) );
+    l.qw->nbits = 8;
+    l.qa->nbits = 8;
+    l.qe->nbits = 8;
+#else
     l.weights = calloc(outputs*inputs, sizeof(float));
+#endif
+
     l.biases = calloc(outputs, sizeof(float));
 
     if(swa) l.weights_swa = calloc(outputs*inputs, sizeof(float));
 
-#ifdef FPGA
-    l.forward = forward_connected_layer_fpga;
-    l.backward = backward_connected_layer_fpga;
-    l.update = update_connected_layer_fpga;
+#ifdef LOWP
+    l.forward = forward_connected_layer_lowp;
+    l.backward = backward_connected_layer_lowp;
+    l.update = update_connected_layer_lowp;
 #else
     l.forward = forward_connected_layer;
     l.backward = backward_connected_layer;
@@ -73,12 +86,21 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
     //float scale = 1./sqrt(inputs);
     float scale = sqrt(2./inputs);
     for(i = 0; i < outputs*inputs; ++i){
+#ifdef LOWP
+        l.weight_updates[i] = scale*rand_uniform(-1, 1);
+#else
         l.weights[i] = scale*rand_uniform(-1, 1);
+#endif
     }
-
     for(i = 0; i < outputs; ++i){
         l.biases[i] = 0;
     }
+
+#ifdef LOWP
+    quantize_with_update(l.weight_updates, l.weights, l.inputs*l.outputs, l.qw); // bit hacky using weight_updates
+    fill_cpu(l.inputs*l.outputs, 0, l.weight_updates, 1);
+    //printf("qw: nbits=%d exp=%d scale=%.6f\n", l.qw->nbits, l.qw->exp, l.qw->scale);
+#endif
 
     if(adam){
         l.m = calloc(l.inputs*l.outputs, sizeof(float));
@@ -152,6 +174,17 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
 #endif
     }
 #endif
+
+#ifdef LOWP
+    l.workspace_size = l.inputs*l.outputs*4;
+    l.cf_size = (l.outputs*l.batch*4 > l.inputs*l.outputs*4) ? (l.outputs*l.batch*4) : (l.inputs*l.outputs*4);
+    l.af_size = l.batch*l.inputs*1;
+    l.bf_size = l.batch*l.outputs*1;
+    l.df_size = l.batch*l.outputs*1;
+#else
+    l.workspace_size = 4;
+#endif
+
     l.activation = activation;
     fprintf(stderr, "connected                            %4d  ->  %4d\n", inputs, outputs);
     return l;
@@ -163,11 +196,17 @@ void update_swa_connected_layer(layer l, update_args a)
     float n_alpha = 1 - a.alpha;
 
     scal_cpu(l.inputs*l.outputs, n_alpha, l.weights_swa, 1);
+
+#ifdef LOWP
+    dequantize_int8(l.weights, a.workspace, l.inputs*l.outputs, l.qw->scale);
+    axpy_cpu(l.inputs*l.outputs, a.alpha, a.workspace, 1, l.weights_swa, 1);
+#else
     axpy_cpu(l.inputs*l.outputs, a.alpha, l.weights, 1, l.weights_swa, 1);
+#endif
 }
 
-
-void update_connected_layer_fpga(layer l, update_args a)
+#ifdef LOWP
+void update_connected_layer_lowp(layer l, update_args a)
 {
     float learning_rate = a.learning_rate*l.learning_rate_scale;
     float momentum = a.momentum;
@@ -181,23 +220,44 @@ void update_connected_layer_fpga(layer l, update_args a)
         scal_cpu(l.outputs, momentum, l.scale_updates, 1);
     }
 
-    axpy_cpu(l.inputs*l.outputs, -decay*batch, l.weights, 1, l.weight_updates, 1);
-    axpy_cpu(l.inputs*l.outputs, learning_rate/batch, l.weight_updates, 1, l.weights, 1);
+    float *temp = a.workspace;
+
+    dequantize_int8(l.weights, temp, l.inputs*l.outputs, l.qw->scale);
+
+    axpy_cpu(l.inputs*l.outputs, -decay*batch, temp, 1, l.weight_updates, 1);
+    axpy_cpu(l.inputs*l.outputs, learning_rate/batch, l.weight_updates, 1, temp, 1);
+
+    //axpy_cpu(l.inputs*l.outputs, decay, temp, 1, l.weight_updates, 1);
+    //axpy_cpu(l.inputs*l.outputs, -learning_rate, l.weight_updates, 1, temp, 1);
+
     scal_cpu(l.inputs*l.outputs, momentum, l.weight_updates, 1);
+    quantize_with_update(temp, l.weights, l.inputs*l.outputs, l.qw);
 }
 
-void forward_connected_layer_fpga(layer l, network net)
+void forward_connected_layer_lowp(layer l, network net)
 {
     fill_cpu(l.batch*l.outputs, 0, l.output, 1);
 
     int m = l.batch;
     int n = l.outputs;
     int k = l.inputs;
+    float scale;
 
-    float *a = net.input;
-    float *b = l.weights;
+    //float *a = net.input;
+    //float *b = l.weights;
+    //float *c = l.output;
+    
+    //gemm(0,1,m,n,k,1,a,k,b,k,1,c,n);
+    
+    int8_t *a = l.weights;
+    int8_t *b = l.input;
     float *c = l.output;
-    gemm(0,1,m,n,k,1,a,k,b,k,1,c,n);
+
+    quantize_with_update(net.input, b, m*k, l.qa);
+    gemm_fixed(a, n, b, k, net.cf, m);
+    scale = (l.qa->scale)*(l.qw->scale);
+    dequantize(net.cf, c, n*m, scale);
+
     if(l.batch_normalize){
         forward_batchnorm_layer(l, net);
     } else {
@@ -206,7 +266,7 @@ void forward_connected_layer_fpga(layer l, network net)
     activate_array(l.output, l.outputs*l.batch, l.activation);
 }
 
-void backward_connected_layer_fpga(layer l, network net)
+void backward_connected_layer_lowp(layer l, network net)
 {
     gradient_array(l.output, l.outputs*l.batch, l.activation, l.delta);
 
@@ -219,21 +279,40 @@ void backward_connected_layer_fpga(layer l, network net)
     int m = l.outputs;
     int k = l.batch;
     int n = l.inputs;
-    float *a = l.delta;
-    float *b = net.input;
+    float scale;
+
+    //float *a = l.delta;
+    //float *b = net.input;
+    //float *c = l.weight_updates;
+    //dequantize_int8(l.input, net.input, l.inputs*l.batch, l.qa->scale);
+
+    //gemm(1,0,m,n,k,1,a,m,b,n,1,c,n);
+
+    int8_t *a = net.af;
+    int8_t *b = net.bf;
     float *c = l.weight_updates;
-    gemm(1,0,m,n,k,1,a,m,b,n,1,c,n);
+
+    transpose_int8(l.input, net.af, k, n);
+    quantize_with_update_transpose(l.delta, net.bf, k, m, k*m, l.qe);
+    gemm_fixed(a, n, b, k, net.cf, m);
+    scale = (l.qa->scale)*(l.qe->scale);
+    dequantize_acc_int(net.cf, c, m*n, scale);   
 
     m = l.batch;
     k = l.outputs;
     n = l.inputs;
 
     a = l.delta;
-    b = l.weights;
+    b = net.workspace;
     c = net.delta;
 
-    if(c) gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
+    dequantize_int8(l.weights, net.workspace, l.inputs*l.outputs, l.qw->scale);
+
+    if(c) {
+        gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
+    }
 }
+#endif
 
 void update_connected_layer(layer l, update_args a)
 {

@@ -105,8 +105,18 @@ typedef struct{
     float eps;
     int t;
     float alpha;
+    float * workspace;
 
 } update_args;
+
+struct quant;
+typedef struct quant quant;
+
+struct quant{
+    int nbits;
+    int exp;
+    float scale;
+};
 
 struct network;
 typedef struct network network;
@@ -239,7 +249,15 @@ struct layer{
     float * scales;
     float * scale_updates;
 
+#ifdef LOWP
+    int8_t * weights;
+    int8_t * input;
+    quant * qw;
+    quant * qa;
+    quant * qe;
+#else
     float * weights;
+#endif
     float * weight_updates;
     float * weights_swa;
 
@@ -335,6 +353,12 @@ struct layer{
     tree *softmax_tree;
 
     size_t workspace_size;
+#ifdef LOWP
+    size_t af_size;
+    size_t bf_size;
+    size_t cf_size;
+    size_t df_size;
+#endif
 
 #ifdef GPU
     int *indexes_gpu;
@@ -496,6 +520,13 @@ typedef struct network{
     float *cost;
     float clip;
 
+#ifdef LOWP
+    int8_t * af;
+    int8_t * bf;
+    int * cf;
+    int8_t * df;
+#endif
+
 #ifdef GPU
     float *input_gpu;
     float *truth_gpu;
@@ -623,6 +654,7 @@ void forward_network(network *net);
 void backward_network(network *net);
 void update_network(network *net);
 void update_swa_network(network *net);
+void update_batch_network(network *netp, int batch);
 
 void network_copy_swa(network *net);
 
@@ -813,6 +845,16 @@ int *read_intlist(char *s, int *n, int d);
 size_t rand_size_t();
 float rand_normal();
 float rand_uniform(float min, float max);
+
+#ifdef LOWP
+void quantize(float *input, int8_t *output, int n, quant *qf);
+void quantize_with_update(float *input, int8_t *output, int n, quant *qf);
+void quantize_with_update_transpose(float *input, int8_t *output, int dim1, int dim2, int n, quant *qf);
+void dequantize(int *input, float *output, int n, float scale);
+void dequantize_int8(int8_t *input, float *output, int n, float scale);
+void dequantize_acc_int(int *input, float *output, int n, float scale);
+void transpose_int8(int8_t *input, int8_t *output, int dim1, int dim2);
+#endif
 
 #ifdef __cplusplus
 }
