@@ -54,7 +54,7 @@ dkms.conf
 # Other
 *.csv
 *.out
-*.png
+#*.png
 *.jpg
 *.pyc
 old/
