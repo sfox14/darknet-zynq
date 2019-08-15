@@ -1,0 +1,3 @@
+[submodule "gemmlowp"]
+	path = gemmlowp
+	url = https://github.com/google/gemmlowp.git
