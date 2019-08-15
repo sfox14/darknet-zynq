@@ -6,6 +6,7 @@
 #include "blas.h"
 #include "gemm.h"
 #include "quant.h"
+#include "activations.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -28,6 +29,7 @@ void gemm_fixed(int8_t *A, int arow, int8_t *B, int brow, int *C, int ccol)
     }
 
 }
+
 
 layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activation, int batch_normalize, int adam, int swa)
 {
@@ -176,7 +178,7 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
 #endif
 
 #ifdef LOWP
-    l.workspace_size = l.inputs*l.outputs*4;
+    l.workspace_size = (l.inputs*l.outputs*4 > l.outputs*l.batch*4) ? (l.inputs*l.outputs*4) : (l.outputs*l.batch*4);
     l.cf_size = (l.outputs*l.batch*4 > l.inputs*l.outputs*4) ? (l.outputs*l.batch*4) : (l.inputs*l.outputs*4);
     l.af_size = l.batch*l.inputs*1;
     l.bf_size = l.batch*l.outputs*1;
@@ -212,6 +214,7 @@ void update_connected_layer_lowp(layer l, update_args a)
     float momentum = a.momentum;
     float decay = a.decay;
     int batch = a.batch;
+
     axpy_cpu(l.outputs, learning_rate/batch, l.bias_updates, 1, l.biases, 1);
     scal_cpu(l.outputs, momentum, l.bias_updates, 1);
 
@@ -221,14 +224,13 @@ void update_connected_layer_lowp(layer l, update_args a)
     }
 
     float *temp = a.workspace;
-
     dequantize_int8(l.weights, temp, l.inputs*l.outputs, l.qw->scale);
 
-    axpy_cpu(l.inputs*l.outputs, -decay*batch, temp, 1, l.weight_updates, 1);
-    axpy_cpu(l.inputs*l.outputs, learning_rate/batch, l.weight_updates, 1, temp, 1);
+    //axpy_cpu(l.inputs*l.outputs, -decay*batch, temp, 1, l.weight_updates, 1);
+    //axpy_cpu(l.inputs*l.outputs, learning_rate/batch, l.weight_updates, 1, temp, 1);
 
-    //axpy_cpu(l.inputs*l.outputs, decay, temp, 1, l.weight_updates, 1);
-    //axpy_cpu(l.inputs*l.outputs, -learning_rate, l.weight_updates, 1, temp, 1);
+    axpy_cpu(l.inputs*l.outputs, decay*batch, temp, 1, l.weight_updates, 1);
+    axpy_cpu(l.inputs*l.outputs, learning_rate/batch, l.weight_updates, 1, temp, 1);
 
     scal_cpu(l.inputs*l.outputs, momentum, l.weight_updates, 1);
     quantize_with_update(temp, l.weights, l.inputs*l.outputs, l.qw);
@@ -243,12 +245,6 @@ void forward_connected_layer_lowp(layer l, network net)
     int k = l.inputs;
     float scale;
 
-    //float *a = net.input;
-    //float *b = l.weights;
-    //float *c = l.output;
-    
-    //gemm(0,1,m,n,k,1,a,k,b,k,1,c,n);
-    
     int8_t *a = l.weights;
     int8_t *b = l.input;
     float *c = l.output;
@@ -264,10 +260,18 @@ void forward_connected_layer_lowp(layer l, network net)
         add_bias(l.output, l.biases, l.batch, l.outputs, 1);
     }
     activate_array(l.output, l.outputs*l.batch, l.activation);
+
 }
 
 void backward_connected_layer_lowp(layer l, network net)
-{
+{ 
+    // quantise l.delta here!! really!! // make sure net.bf is big enough
+    //if (strcmp(get_activation_string(l.activation), "linear")==0){
+    //}else{
+    //quantize_with_update(l.delta, net.bf, l.outputs*l.batch, l.qe);
+    //dequantize_int8(net.bf, l.delta, l.outputs*l.batch, l.qe->scale);
+    //}
+
     gradient_array(l.output, l.outputs*l.batch, l.activation, l.delta);
 
     if(l.batch_normalize){
@@ -281,13 +285,6 @@ void backward_connected_layer_lowp(layer l, network net)
     int n = l.inputs;
     float scale;
 
-    //float *a = l.delta;
-    //float *b = net.input;
-    //float *c = l.weight_updates;
-    //dequantize_int8(l.input, net.input, l.inputs*l.batch, l.qa->scale);
-
-    //gemm(1,0,m,n,k,1,a,m,b,n,1,c,n);
-
     int8_t *a = net.af;
     int8_t *b = net.bf;
     float *c = l.weight_updates;
@@ -298,19 +295,24 @@ void backward_connected_layer_lowp(layer l, network net)
     scale = (l.qa->scale)*(l.qe->scale);
     dequantize_acc_int(net.cf, c, m*n, scale);   
 
-    m = l.batch;
-    k = l.outputs;
-    n = l.inputs;
+    if (net.delta){
 
-    a = l.delta;
-    b = net.workspace;
-    c = net.delta;
+        m = l.batch;
+        k = l.outputs;
+        n = l.inputs;
 
-    dequantize_int8(l.weights, net.workspace, l.inputs*l.outputs, l.qw->scale);
+        a = net.af; 
+        b = net.df;
+        c = net.delta;
 
-    if(c) {
-        gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
+        transpose_int8(l.weights, net.af, k, n);
+        transpose_int8(net.bf, net.df, k, m);
+        gemm_fixed(a, n, b, k, net.cf, m);
+        scale = (l.qw->scale)*(l.qe->scale);
+        dequantize(net.cf, c, n*m, scale);
+
     }
+
 }
 #endif
 

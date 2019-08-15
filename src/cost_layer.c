@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "cuda.h"
 #include "blas.h"
+#include "quant.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -81,6 +82,7 @@ void resize_cost_layer(cost_layer *l, int inputs)
 
 void forward_cost_layer(cost_layer l, network net)
 {
+
     if (!net.truth) return;
     if(l.cost_type == MASKED){
         int i;
@@ -95,11 +97,13 @@ void forward_cost_layer(cost_layer l, network net)
     } else {
         l2_cpu(l.batch*l.inputs, net.input, net.truth, l.delta, l.output);
     }
+
     l.cost[0] = sum_array(l.output, l.batch*l.inputs);
 }
 
 void backward_cost_layer(const cost_layer l, network net)
 {
+    //fill_cpu(l.batch*l.inputs, 0, net.delta, 1);
     axpy_cpu(l.batch*l.inputs, l.scale, l.delta, 1, net.delta, 1);
 }
 

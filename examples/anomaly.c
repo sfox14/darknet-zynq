@@ -14,6 +14,39 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
     int classes = 32;
     int N = 984;
 
+    FILE *fp = fopen("32x16.bin", "rb");
+    fread((net->layers[0]).weights, sizeof(int8_t), 32*16, fp);
+    (net->layers[0]).qw->scale = 0.001953125;
+    (net->layers[0]).qw->exp = -3;
+    fclose(fp);
+
+    FILE *fp1 = fopen("16x8.bin", "rb");
+    fread((net->layers[1]).weights, sizeof(int8_t), 16*8, fp1);
+    (net->layers[1]).qw->scale = 0.00390625;
+    (net->layers[1]).qw->exp = -2;
+    fclose(fp1);
+
+    FILE *fp2 = fopen("8x16.bin", "rb");
+    fread((net->layers[2]).weights, sizeof(int8_t), 8*16, fp2);
+    (net->layers[2]).qw->scale = 0.00390625;
+    (net->layers[2]).qw->exp = -2;
+    fclose(fp2);
+
+    FILE *fp3 = fopen("16x32.bin", "rb");
+    fread((net->layers[3]).weights, sizeof(int8_t), 16*32, fp3);
+    (net->layers[3]).qw->scale = 0.00390625;
+    (net->layers[3]).qw->exp = -2;
+    fclose(fp3);
+
+    for (int i=0; i<16; i++){
+        for (int j=0; j<32; j++){
+            printf("%d ", (net->layers[0]).weights[i*32 + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+
+
     int epoch = (*net->seen)/N;
     data train = load_rf_data(filename);
     
@@ -56,7 +89,7 @@ void train_anomaly(char *cfgfile, char *filename, char *weightfile)
     char buff[256];
     sprintf(buff, "%s/%s.weights", backup_directory, base);
     save_weights(net, buff);
-    
+
     free_network(net);
     free(base);
     free_data(train);
