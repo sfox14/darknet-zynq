@@ -1,6 +1,7 @@
 #ifdef LOWP
 
 #include "quant.h"
+#include <math.h>
 
 
 float max_array(float *input, int n)
@@ -25,14 +26,16 @@ int get_mexp(float *input, int n)
     float mval,eval;
     int result;
     mval = max_array(input, n);
-    //printf("mval=%.6f ", mval);
+    printf("mval=%.4f ", mval);
 
     eval = _log2(mval);
-    //printf("eval=%.6f ", eval);
-    if (eval<0) result = eval-0.99;
-    else result = eval + 0.5;
+    printf("eval=%.6f ", eval);
+    if (eval<0) result = floor(eval); //-0.99;
+    else result = floor(eval); // + 0.5;
 
     // result.clamp(exp_min, exp_max)
+    printf("exp=%d\n", result);
+
     if (result>exp_max) return exp_max;
         else if (result<exp_min) return exp_min;
             else return result;
@@ -52,7 +55,7 @@ float _toFloat(int a, float scale)
     //float val = 1; // << fb;
     //if (fbits>0) result = a/val;
     //else result = a*val;
-    result = a * scale;
+    result = (float)(a) * scale;
 
     if (cnt < 256){
         //printf("%d %.6f %.6f\n", a, scale, result);
@@ -84,29 +87,43 @@ float _toFloat_int8(int8_t a, float scale)
     return result;
 }
 
-int _toFixed(float a, int fbits)
-{
+float stochastic_rounding(float x){
 
-    int static cnt = 0;
+    float decimal = fabs(x - trunc(x));
+    float random_selector = (float)rand() / RAND_MAX;
+    float adjustor;
+    if (random_selector < decimal) adjustor = 1;
+    else adjustor = 0;
+    // consider sign
+    if(x < 0) adjustor = -1 * adjustor;
 
-    int result;
-    int fb = abs(fbits);
-    int val = 1 << fb; //logical shift
+    return trunc(x) + adjustor;
 
-    float imm;
-    if (fbits>0) imm=a*val;
-    else imm = a/val;
+}
 
-    if (a<0) result = imm - 0.5; //nearest rounding
-    else result = imm + 0.5;
+float nearest_rounding(float x){
+    
+    float result;
+    float lo = fabs(x - trunc(x));
+    float adjustment;
+    if (lo>=0.5) adjustment = 1;
+    else adjustment = 0;
 
-    //if (cnt<108) printf("%.6f %d\n", a, result);
+    if (x < 0) adjustment = -1 * adjustment;
 
-
-    cnt += 1;
-
+    result = (trunc(x) + adjustment);
     return result;
 }
+
+float nearest_rounding_v2(float x){
+    
+    float result;
+    float imm;
+    imm = x + 0.5;
+    result = floor(imm);
+    return result;
+}
+
 
 void _transpose_float(int *input, float *output, int dim1, int dim2, float scale)
 {
@@ -134,7 +151,17 @@ void _array_int8_float(int8_t *input, float *output, int n, float scale)
 
 int8_t _toFixed_int8(float a, int fbits)
 {
+    
+    
+    int temp, temp2;
+    int8_t result;
+    float scale;
+    float imm;
 
+    scale = pow(2, fbits);
+    imm = a * scale;
+
+    /*
     int8_t result;
     int fb = abs(fbits);
     int val = 1 << fb; //logical shift
@@ -142,13 +169,31 @@ int8_t _toFixed_int8(float a, int fbits)
     float imm;
     if (fbits>0) imm=a*val; // do left shift
     else imm = a/val; // do right_shift
+    */
 
-    if (a<0) result = imm - 0.5; //nearest rounding
-    else result = imm + 0.5;
+    //imm = stochastic_rounding(imm);
+    //result = imm;
+
+    imm = nearest_rounding_v2(imm);
+    temp = imm;
+    temp2 = (temp < -128) ? -128 : temp;  // 8-bit boundaries
+    result = (temp2 > 127) ? 127 : temp2;
+    //result = imm;
+
+        //int8_t imm2;
+        //if (a<0) imm2 = imm - 0.5;
+        //else imm2 = imm + 0.5;
+
+        //if (a<0) result = imm - 0.5; //nearest rounding
+        //else result = imm + 0.5;
+
+
+    //printf("%f %f %f %f %d %d\n", imm, trunc(imm), lo, adjustment, imm2, result);
 
     //printf("%d %.6f %.6f\n", result, imm, a);
-
+    //*/
     return result;
+    
 }
 
 void transpose_fixed_int8(float *input, int8_t *output, int dim1, int dim2, int fbits)

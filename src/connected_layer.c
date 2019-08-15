@@ -6,6 +6,7 @@
 #include "blas.h"
 #include "gemm.h"
 #include "quant.h"
+#include "activations.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -28,6 +29,7 @@ void gemm_fixed(int8_t *A, int arow, int8_t *B, int brow, int *C, int ccol)
     }
 
 }
+
 
 layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activation, int batch_normalize, int adam, int swa)
 {
@@ -176,7 +178,7 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
 #endif
 
 #ifdef LOWP
-    l.workspace_size = l.inputs*l.outputs*4;
+    l.workspace_size = (l.inputs*l.outputs*4 > l.outputs*l.batch*4) ? (l.inputs*l.outputs*4) : (l.outputs*l.batch*4);
     l.cf_size = (l.outputs*l.batch*4 > l.inputs*l.outputs*4) ? (l.outputs*l.batch*4) : (l.inputs*l.outputs*4);
     l.af_size = l.batch*l.inputs*1;
     l.bf_size = l.batch*l.outputs*1;
@@ -212,8 +214,10 @@ void update_connected_layer_lowp(layer l, update_args a)
     float momentum = a.momentum;
     float decay = a.decay;
     int batch = a.batch;
-    axpy_cpu(l.outputs, learning_rate/batch, l.bias_updates, 1, l.biases, 1);
-    scal_cpu(l.outputs, momentum, l.bias_updates, 1);
+
+    //momentum = 0;
+    //axpy_cpu(l.outputs, learning_rate/batch, l.bias_updates, 1, l.biases, 1);
+    //scal_cpu(l.outputs, momentum, l.bias_updates, 1);
 
     if(l.batch_normalize){
         axpy_cpu(l.outputs, learning_rate/batch, l.scale_updates, 1, l.scales, 1);
@@ -221,14 +225,13 @@ void update_connected_layer_lowp(layer l, update_args a)
     }
 
     float *temp = a.workspace;
-
     dequantize_int8(l.weights, temp, l.inputs*l.outputs, l.qw->scale);
-
-    axpy_cpu(l.inputs*l.outputs, -decay*batch, temp, 1, l.weight_updates, 1);
-    axpy_cpu(l.inputs*l.outputs, learning_rate/batch, l.weight_updates, 1, temp, 1);
 
     //axpy_cpu(l.inputs*l.outputs, decay, temp, 1, l.weight_updates, 1);
     //axpy_cpu(l.inputs*l.outputs, -learning_rate, l.weight_updates, 1, temp, 1);
+
+    axpy_cpu(l.inputs*l.outputs, decay*batch, temp, 1, l.weight_updates, 1);
+    axpy_cpu(l.inputs*l.outputs, -learning_rate/batch, l.weight_updates, 1, temp, 1);
 
     scal_cpu(l.inputs*l.outputs, momentum, l.weight_updates, 1);
     quantize_with_update(temp, l.weights, l.inputs*l.outputs, l.qw);
@@ -243,20 +246,108 @@ void forward_connected_layer_lowp(layer l, network net)
     int k = l.inputs;
     float scale;
 
-    //float *a = net.input;
-    //float *b = l.weights;
-    //float *c = l.output;
+/*
+    float *a = net.input;
+    float *b = net.workspace; //l.weights;
+    float *c = l.output;
     
-    //gemm(0,1,m,n,k,1,a,k,b,k,1,c,n);
-    
+    dequantize_int8(l.weights, net.workspace, l.inputs*l.outputs, l.qw->scale);
+
+    gemm(0,1,m,n,k,1,a,k,b,k,1,c,n);
+*/
+    static int iter = 0;
+    static int cnt = 0;
+
+    if (cnt == 4){
+        cnt = 0;
+        iter += 1;
+    }
+
+    printf("\n[%d] forward_%d: %dx%d\n", iter, cnt, l.inputs, l.outputs);
+    printf("-------------------------------\n");
+
     int8_t *a = l.weights;
     int8_t *b = l.input;
     float *c = l.output;
+
+    /*
+    printf("inputs before: \n");
+    float iif = 0;
+    for (int i=0; i<984; i++){
+        if(i==46) printf("[%d] ", i);
+        for (int j=0; j<l.inputs; j++){
+            if(i==46) printf("%.12f ", net.input[i*l.inputs + j]);
+            iif += net.input[i*l.inputs + j];
+        }
+        if(i==46) printf("\n");
+    }
+    printf("in sum float = %.15f\n", iif);
+    */
 
     quantize_with_update(net.input, b, m*k, l.qa);
     gemm_fixed(a, n, b, k, net.cf, m);
     scale = (l.qa->scale)*(l.qw->scale);
     dequantize(net.cf, c, n*m, scale);
+
+    /*
+    printf("inputs: \n");
+    float sumif = 0;
+    for (int i=0; i<984; i++){
+        if(i==46) printf("[%d] ", i);
+        for (int j=0; j<l.inputs; j++){
+            if(i==46) printf("%.4f ", l.input[i*l.inputs + j]*l.qa->scale);
+            sumif += l.input[i*l.inputs + j]*l.qa->scale;
+        }
+        if(i==46) printf("\n");
+    }
+    */
+
+
+    
+    char fname[50];
+    sprintf(fname, "fwd_in_%d_%d.bin", cnt, iter);
+    FILE *fp1 = fopen(fname, "wb");
+    dequantize_int8(l.input, net.workspace, l.inputs*l.batch, l.qa->scale);
+    fwrite(net.workspace, sizeof(float), l.inputs*l.batch, fp1);
+    fclose(fp1);     
+    
+
+    /*
+    printf("in sum = %.15f\n", sumif);
+
+    printf("weights: \n");
+    float wif = 0;
+    for (int i=0; i<l.outputs; i++){
+        printf("[%d] ", i);
+        for (int j=0; j<l.inputs; j++){
+            printf("%.4f ", l.weights[i*l.inputs + j]*l.qw->scale);
+            wif += l.weights[i*l.inputs + j]*l.qw->scale;
+        }
+        printf("\n");
+    }
+    printf("weight sum = %.15f\n", wif);
+    */
+
+    /*
+    printf("output: \n");
+    float cif = 0;
+    for (int i=0; i<984; i++){
+        if(i<2) printf("[%d] ", i);
+        for (int j=0; j<n; j++){
+            if(i<2) printf("%.4f ", c[i*n + j]);
+            cif += c[i*n + j];
+        }
+        if(i<2) printf("\n");
+    }
+    printf("out sum = %.15f\n", cif);
+    */
+
+    //char fname[50];
+    sprintf(fname, "fwd_out_%d_%d.bin", cnt, iter);
+    FILE *fp2 = fopen(fname, "wb");
+    fwrite(c, sizeof(float), l.outputs*l.batch, fp2);
+    fclose(fp2);     
+
 
     if(l.batch_normalize){
         forward_batchnorm_layer(l, net);
@@ -264,11 +355,74 @@ void forward_connected_layer_lowp(layer l, network net)
         add_bias(l.output, l.biases, l.batch, l.outputs, 1);
     }
     activate_array(l.output, l.outputs*l.batch, l.activation);
+
+    cnt += 1;
+
 }
 
 void backward_connected_layer_lowp(layer l, network net)
 {
+    static int iter = 0;
+    static int cnt = 0;
+
+    if (cnt == 4){
+        cnt = 0;
+        iter += 1;
+    }
+
+    printf("\n[%d] backward_%d: %dx%d\n", iter, cnt, l.inputs, l.outputs);
+    printf("-------------------------------\n");
+    
+
+    printf("\ndelta_before: \n");
+    float dib = 0;
+    for (int i=0; i<984; i++){
+        if(i==768) printf("[%d] ", i);
+        for (int j=0; j<l.outputs; j++){
+            if(i==768) printf("%.4f ", l.delta[i*l.outputs + j]);
+            dib += l.delta[i*l.outputs + j];
+        }
+        if(i==768) printf("\n");
+    }
+    printf("delta before sum = %.15f\n", dib);
+
+    printf("\nactivation: \n");
+    float dag = 0;
+    for (int i=0; i<984; i++){
+        if(i==768) printf("[%d] ", i);
+        for (int j=0; j<l.outputs; j++){
+            if(i==768) printf("%.4f ", l.output[i*l.outputs + j]);
+            dag += l.output[i*l.outputs + j];
+        }
+        if(i==768) printf("\n");
+    }
+    printf("activation sum = %.15f\n", dag);
+    
+
+    // quantise l.delta here!! really!! // make sure net.bf is big enough
+    if (strcmp(get_activation_string(l.activation), "linear")==0){
+        printf("linear do nothing %d\n", cnt);
+    }else{
+        printf("relu %d\n", cnt);
+        quantize_with_update(l.delta, net.bf, l.outputs*l.batch, l.qe);
+        dequantize_int8(net.bf, l.delta, l.outputs*l.batch, l.qe->scale);
+    }
+
     gradient_array(l.output, l.outputs*l.batch, l.activation, l.delta);
+
+    
+    printf("\ndelta_after: \n");
+    float dab = 0;
+    for (int i=0; i<984; i++){
+        if(i==768) printf("[%d] ", i);
+        for (int j=0; j<l.outputs; j++){
+            if(i==768) printf("%.4f ", l.delta[i*l.outputs + j]);
+            dab += l.delta[i*l.outputs + j];
+        }
+        if(i==768) printf("\n");
+    }
+    printf("delta_after sum = %.15f\n", dab);
+
 
     if(l.batch_normalize){
         backward_batchnorm_layer(l, net);
@@ -276,18 +430,28 @@ void backward_connected_layer_lowp(layer l, network net)
         backward_bias(l.bias_updates, l.delta, l.batch, l.outputs, 1);
     }
 
+    /*
+    printf("bias_updates: \n");
+    for (int i=0; i<l.outputs; i++){
+        printf("%.4f ", l.bias_updates[i]);
+    }
+    printf("\n");
+    */
+
     int m = l.outputs;
     int k = l.batch;
     int n = l.inputs;
     float scale;
-
-    //float *a = l.delta;
-    //float *b = net.input;
-    //float *c = l.weight_updates;
+/*
+    float *a = l.delta;
+    float *b = net.input;
+    float *c = l.weight_updates;
     //dequantize_int8(l.input, net.input, l.inputs*l.batch, l.qa->scale);
 
-    //gemm(1,0,m,n,k,1,a,m,b,n,1,c,n);
+    gemm(1,0,m,n,k,1,a,m,b,n,1,c,n);
+*/
 
+    ///*
     int8_t *a = net.af;
     int8_t *b = net.bf;
     float *c = l.weight_updates;
@@ -298,6 +462,82 @@ void backward_connected_layer_lowp(layer l, network net)
     scale = (l.qa->scale)*(l.qe->scale);
     dequantize_acc_int(net.cf, c, m*n, scale);   
 
+    char fname[50];
+    sprintf(fname, "bwd_delta_in_%d_%d.bin", cnt, iter);
+    FILE *fp1 = fopen(fname, "wb");
+    dequantize_int8(net.bf, net.workspace, l.outputs*l.batch, l.qe->scale);
+    fwrite(net.workspace, sizeof(float), l.outputs*l.batch, fp1);
+    fclose(fp1);
+
+    sprintf(fname, "bwd_wup_%d_%d.bin", cnt, iter);
+    FILE *fp2 = fopen(fname, "wb");
+    fwrite(c, sizeof(float), l.outputs*l.inputs, fp2);
+    fclose(fp2);
+
+    printf("\ndelta in: \n");
+    float sumd = 0;
+    for (int i=0; i<984; i++){
+        if (i==768) printf("[%d] ", i);
+        for (int j=0; j<l.outputs; j++){
+            if (i==768) printf("%.4f ", net.bf[j*984 + i]*l.qe->scale);
+            sumd += net.bf[j*984 + i]*l.qe->scale;
+        }
+        if (i==768) printf("\n");
+    }
+    printf("delta in = %.15f\n", sumd);
+
+
+    printf("\nweight_updates: \n");
+    float wsum = 0;
+    for (int i=0; i<l.outputs; i++){
+        printf("[%d] ", i);
+        for (int j=0; j<l.inputs; j++){
+            printf("%.4f ", c[i*l.inputs + j]);
+            wsum += c[i*l.inputs + j];
+        }
+        printf("\n");
+    }
+    printf("wsum = %.15f\n", wsum);
+
+    /*
+    printf("input: \n");
+    float iqb = 0;
+    for (int i=0; i<984; i++){
+        if(i<2) printf("[%d] ", i);
+        for (int j=0; j<l.inputs; j++){
+            if(i<2) printf("%.4f ", l.input[i*l.inputs + j]*l.qa->scale);
+            iqb += l.input[i*l.inputs + j]*l.qa->scale;
+        }
+        if(i<2) printf("\n");
+    }
+    printf("input back sum = %.15f\n", iqb);
+
+    printf("delta: \n");
+    float sumd = 0;
+    for (int i=0; i<984; i++){
+        if (i<2) printf("[%d] ", i);
+        for (int j=0; j<l.outputs; j++){
+            if (i<2) printf("%.4f ", net.bf[j*984 + i]*l.qe->scale);
+            sumd += net.bf[j*984 + i]*l.qe->scale;
+        }
+        if (i<2) printf("\n");
+    }
+    printf("sumd = %.15f\n", sumd);
+
+    printf("weight_updates: \n");
+    for (int i=0; i<l.outputs; i++){
+        printf("[%d] ", i);
+        for (int j=0; j<l.inputs; j++){
+            printf("%.4f ", c[i*l.inputs + j]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+    */
+    //*/
+    
+
+    /*
     m = l.batch;
     k = l.outputs;
     n = l.inputs;
@@ -311,6 +551,48 @@ void backward_connected_layer_lowp(layer l, network net)
     if(c) {
         gemm(0,0,m,n,k,1,a,k,b,n,1,c,n);
     }
+    */
+
+    ///*
+    if (net.delta){
+
+        m = l.batch;
+        k = l.outputs;
+        n = l.inputs;
+
+        a = net.af; 
+        b = net.df;
+        c = net.delta;
+
+        transpose_int8(l.weights, net.af, k, n);
+        transpose_int8(net.bf, net.df, k, m);
+        gemm_fixed(a, n, b, k, net.cf, m);
+        scale = (l.qw->scale)*(l.qe->scale);
+        dequantize(net.cf, c, n*m, scale);
+
+        sprintf(fname, "bwd_delta_out_%d_%d.bin", cnt, iter);
+        FILE *fp3 = fopen(fname, "wb");
+        fwrite(c, sizeof(float), l.batch*l.inputs, fp3);
+        fclose(fp3);
+
+        printf("\ndelta out: \n");
+        float dout = 0;
+        for (int i=0; i<984; i++){
+            if (i==768) printf("[%d] ", i);
+            for (int j=0; j<l.inputs; j++){
+                if (i==768) printf("%.4f ", c[i*l.inputs + j]);
+                dout += c[i*l.inputs + j];
+            }
+            if (i==768) printf("\n");
+        }
+        printf("delta out = %.15f\n", dout);
+
+    }
+    //*/
+
+
+    cnt += 1;
+
 }
 #endif
 

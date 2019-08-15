@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "cuda.h"
 #include "blas.h"
+#include "quant.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -53,6 +54,11 @@ cost_layer make_cost_layer(int batch, int inputs, COST_TYPE cost_type, float sca
     l.output = calloc(inputs*batch, sizeof(float));
     l.cost = calloc(1, sizeof(float));
 
+//#ifdef LOWP
+//    l.qa = (quant *) malloc( sizeof(quant) );
+//    l.qa->nbits = 8;
+//#endif
+
     l.forward = forward_cost_layer;
     l.backward = backward_cost_layer;
     #ifdef GPU
@@ -81,6 +87,12 @@ void resize_cost_layer(cost_layer *l, int inputs)
 
 void forward_cost_layer(cost_layer l, network net)
 {
+
+//#ifdef LOWP
+//    quantize_with_update(net.truth, net.af, l.batch*l.inputs, l.qa);
+//    dequantize_int8(net.af, net.truth, l.batch*l.inputs, l.qa->scale);
+//#endif
+
     if (!net.truth) return;
     if(l.cost_type == MASKED){
         int i;
@@ -95,12 +107,37 @@ void forward_cost_layer(cost_layer l, network net)
     } else {
         l2_cpu(l.batch*l.inputs, net.input, net.truth, l.delta, l.output);
     }
+
+    static int cnt = 0;
+
+    char fname[50];
+    sprintf(fname, "cost_%d.bin", cnt);
+    FILE *fp = fopen(fname, "wb");
+    fwrite(l.output, sizeof(float), l.inputs*l.batch, fp);
+    fclose(fp);
+
     l.cost[0] = sum_array(l.output, l.batch*l.inputs);
+
+    cnt += 1;
 }
 
 void backward_cost_layer(const cost_layer l, network net)
 {
+    //fill_cpu(l.batch*l.inputs, 0, net.delta, 1);
     axpy_cpu(l.batch*l.inputs, l.scale, l.delta, 1, net.delta, 1);
+
+    printf("cost delta: \n");
+    float cab = 0;
+    for (int i=0; i<984; i++){
+        if(i==768) printf("[%d] ", i);
+        for (int j=0; j<l.outputs; j++){
+            if(i==768) printf("%.4f ", net.delta[i*l.outputs + j]);
+            cab += net.delta[i*l.outputs + j];
+        }
+        if(i==768) printf("\n");
+    }
+    printf("cost delta = %.15f\n", cab);
+
 }
 
 #ifdef GPU

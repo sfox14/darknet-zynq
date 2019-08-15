@@ -338,6 +338,8 @@ float train_network_sgd(network *net, data d, int n)
 
 float train_network(network *net, data d)
 {
+    static int cnt = 0;
+
     assert(d.X.rows % net->batch == 0);
     int batch = net->batch;
     int n = d.X.rows / batch;
@@ -349,6 +351,9 @@ float train_network(network *net, data d)
         float err = train_network_datum(net);
         sum += err;
     }
+    printf("#--------------------------------------#\n[ep.%d]cost=%.15f\n#------------------------------------------#\n", cnt, sum);
+    cnt += 1;
+
     return (float)sum/(n*batch);
 }
 
