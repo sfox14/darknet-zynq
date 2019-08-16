@@ -250,6 +250,7 @@ void forward_connected_layer_lowp(layer l, network net)
     float *c = l.output;
 
     quantize_with_update(net.input, b, m*k, l.qa);
+    //gemm_lowp(a, n, b, k, net.cf, m); // gemm_lowp does not work for int8 operands
     gemm_fixed(a, n, b, k, net.cf, m);
     scale = (l.qa->scale)*(l.qw->scale);
     dequantize(net.cf, c, n*m, scale);

@@ -67,9 +67,10 @@ CFLAGS+= -DFPGA -DLOWP
 endif
 
 ifeq ($(LOWP), 1) 
-COMMON+= -DLOWP
-CFLAGS+= -DLOWP
-#LDFLAGS+= -lcudnn
+COMMON+= -DLOWP -I./gemmlowp
+CFLAGS+= -DLOWP -msse4.1
+CPP+= --std=c++11
+#LDFLAGS+= -lcudnn 
 endif
 
 
@@ -80,6 +81,11 @@ ifeq ($(GPU), 1)
 LDFLAGS+= -lstdc++ 
 OBJ+=convolutional_kernels.o deconvolutional_kernels.o activation_kernels.o im2col_kernels.o col2im_kernels.o blas_kernels.o crop_layer_kernels.o dropout_layer_kernels.o maxpool_layer_kernels.o avgpool_layer_kernels.o
 endif
+ifeq ($(LOWP), 1)
+LDFLAGS += -lstdc++
+OBJ+=gemm_lowp.o
+endif 
+
 
 EXECOBJ = $(addprefix $(OBJDIR), $(EXECOBJA))
 OBJS = $(addprefix $(OBJDIR), $(OBJ))
