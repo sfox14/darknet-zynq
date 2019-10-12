@@ -11,3 +11,14 @@ For questions or issues please use the [Google Group](https://groups.google.com/
 
 # Darknet + ZYNQ #
 Supports low precision training and inference on CPU and FPGA. 
+
+```
+make clean
+make LOWP=1
+```
+
+```
+./darknet anomaly train cfg/anomaly.cfg data/ad_train.bin
+./darknet anomaly test cfg/anomaly.cfg data/ad_test.bin backup/anomaly.weights
+```
+
