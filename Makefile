@@ -63,7 +63,9 @@ endif
 ifeq ($(FPGA), 1)
 COMMON+= -DFPGA -DLOWP
 CFLAGS+= -DFPGA -DLOWP
-#LDFLAGS+= -lcudnn
+CC := aarch64-linux-gnu-gcc
+CPP := aarch64-linux-gnu-g++
+LDFLAGS += -l ./boards/RFSoC/gemm_i8f32_preload_tile_16x16_tree_4x/libgemm_i8f32_preload_tile_16x16_tree_4x.so
 endif
 
 ifeq ($(LOWP), 1) 
@@ -84,9 +86,13 @@ endif
 ifeq ($(LOWP), 1)
 LDFLAGS += -lstdc++
 OBJ+=gemm_lowp.o
+endif
+ifeq ($(FPGA), 1)
+EXECOBJA+=tbgemm.o cma_test.o xlnk_test.o
 endif 
 
 
+BITSTREAM = "./boards/RFSoC/gemm_i8f32_preload_tile_16x16_tree_4x/libgemm_i8f32_preload_tile_16x16_tree_4x.bit"
 EXECOBJ = $(addprefix $(OBJDIR), $(EXECOBJA))
 OBJS = $(addprefix $(OBJDIR), $(OBJ))
 DEPS = $(wildcard src/*.h) Makefile include/darknet.h
@@ -119,6 +125,14 @@ backup:
 	mkdir -p backup
 results:
 	mkdir -p results
+
+
+# Zynq specific
+#bitstream:
+#ifeq($(FPGA), 1)
+#	python3 ./boards/load.py $(BITSTREAM)
+#endif
+
 
 .PHONY: clean
 

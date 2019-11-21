@@ -249,7 +249,7 @@ struct layer{
     float * scales;
     float * scale_updates;
 
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     int8_t * weights;
     int8_t * input;
     quant * qw;
@@ -353,7 +353,7 @@ struct layer{
     tree *softmax_tree;
 
     size_t workspace_size;
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     size_t af_size;
     size_t bf_size;
     size_t cf_size;
@@ -520,7 +520,7 @@ typedef struct network{
     float *cost;
     float clip;
 
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     int8_t * af;
     int8_t * bf;
     int * cf;
@@ -846,7 +846,7 @@ size_t rand_size_t();
 float rand_normal();
 float rand_uniform(float min, float max);
 
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
 void quantize(float *input, int8_t *output, int n, quant *qf);
 void quantize_with_update(float *input, int8_t *output, int n, quant *qf);
 void quantize_with_update_transpose(float *input, int8_t *output, int dim1, int dim2, int n, quant *qf);
@@ -855,6 +855,13 @@ void dequantize_int8(int8_t *input, float *output, int n, float scale);
 void dequantize_acc_int(int *input, float *output, int n, float scale);
 void transpose_int8(int8_t *input, int8_t *output, int dim1, int dim2);
 #endif
+
+// hardware accelerator gemm definition
+#ifdef FPGA
+void p_0_gemm_hw_1_noasync(int8_t * A, int arow, int8_t * B, int brow, float * C, int ccol, int acopy, 
+    int batch, int ctrl, int TAw, int TAr, float ascale, float * bscale);
+#endif
+
 
 #ifdef __cplusplus
 }

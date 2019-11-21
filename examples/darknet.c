@@ -21,7 +21,10 @@ extern void run_go(int argc, char **argv);
 extern void run_art(int argc, char **argv);
 extern void run_super(int argc, char **argv);
 extern void run_lsd(int argc, char **argv);
+
+#if defined (LOWP) || defined (FPGA)
 extern void run_anomaly(int argc, char **argv);
+#endif
 
 void average(int argc, char *argv[])
 {
@@ -438,9 +441,15 @@ int main(int argc, char **argv)
         test_detector("cfg/coco.data", argv[2], argv[3], filename, thresh, .5, outfile, fullscreen);
     } else if (0 == strcmp(argv[1], "cifar")){
         run_cifar(argc, argv);
-    } else if (0 == strcmp(argv[1], "anomaly")){
+    }
+
+#if defined (LOWP) || defined (FPGA)    
+    else if (0 == strcmp(argv[1], "anomaly")){
         run_anomaly(argc, argv);
-    } else if (0 == strcmp(argv[1], "go")){
+    } 
+#endif
+
+    else if (0 == strcmp(argv[1], "go")){
         run_go(argc, argv);
     } else if (0 == strcmp(argv[1], "rnn")){
         run_char_rnn(argc, argv);
@@ -499,7 +508,7 @@ int main(int argc, char **argv)
     } else if (0 == strcmp(argv[1], "imtest")){
         test_resize(argv[2]);
     } else {
-        fprintf(stderr, "Not an option: %s\n", argv[1]);
+        fprintf(stderr, "Not an option: %s (** try compiling with LOWP=1 or FPGA=1)\n ", argv[1]);
     }
     return 0;
 }

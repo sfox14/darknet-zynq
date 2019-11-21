@@ -1,5 +1,7 @@
 #include "darknet.h"
 
+#if defined (LOWP) || defined (FPGA)
+
 void train_anomaly(char *cfgfile, char *filename, char *weightfile)
 {
     srand(23);
@@ -149,3 +151,4 @@ void run_anomaly(int argc, char **argv)
 }
 
 
+#endif
