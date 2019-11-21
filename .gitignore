@@ -78,3 +78,6 @@ ehthumbs.db
 Icon?
 Thumbs.db
 *.swp
+
+# Xilinx SDSoC
+*.dat

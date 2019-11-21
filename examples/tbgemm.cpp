@@ -15,6 +15,8 @@ extern "C" {
 //#include "fpga.h" 
 }
 
+#ifdef FPGA
+
 #define BITWIDTH 8
 #define VECTOR_WIDTH 16
 #define NUM_PES 16
@@ -22,6 +24,55 @@ extern "C" {
 #define C_DEPTH 133  
 
 typedef int8_t data_t;
+
+
+void hw_accel_float(float *A, int arow, float *B, int brow, float *C, int ccol, int batch)
+{
+
+    /*
+    GEMM:
+     - preload matrix A
+     - stream B, reuse A, stream C
+     - optionally transpose A
+     - optionally transpose B
+     - compute C=AB
+     - **Future: Tile matrix A to handle any problem size**
+    */
+
+    // compute
+    //for (int i = 0; i < ccol; i++) {
+    //    for (int j = 0; j < arow; j++) {
+    //      float result = 0;
+    //      for (int k = 0; k < brow; k++) {
+    //        result += A[j*brow+k] * B[i*brow+k];
+    //      }
+    //      C[i*arow+j] = result;
+    //    }
+    // }
+
+	for (int bt=0; bt<batch; bt++){
+
+		float *Cf = C + bt*ccol*arow;
+		float *Bf = B + bt*brow*ccol;
+
+		// reset
+		for (int i=0; i<arow*ccol; i++){
+			Cf[i] = 0;
+		}
+
+		for (int j = 0; j < arow; j++) {
+			for (int i = 0; i < ccol; i++) {
+				for (int k = 0; k < brow; k++) {
+
+					Cf[i*arow + j] += A[j*brow+k] * Bf[i*brow+k];
+
+				}
+			}
+		}
+
+	}
+
+}
 
 
 data_t toFixed(float a, float scale)
@@ -208,7 +259,7 @@ void example_arow_big(float *A, float *B, float *C, data_t *Af, data_t *Bf, floa
 }
 
 
-int main(int argc, char** argv)
+void run_tbgemm(int argc, char** argv)
 {
 
 	float *A, *B, *C, *ascale, *bscale;
@@ -263,5 +314,6 @@ int main(int argc, char** argv)
 	cma_free(ascale);
 	cma_free(bscale);
 
-    return 0;
 }
+
+#endif

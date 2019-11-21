@@ -448,6 +448,15 @@ int main(int argc, char **argv)
         run_anomaly(argc, argv);
     } 
 #endif
+#ifdef FPGA
+    else if (0 == strcmp(argv[1], "tbgemm")){
+        run_tbgemm(argc, argv);
+    } else if (0 == strcmp(argv[1], "cma_test")){
+        run_cma_test(argc, argv);
+    } else if (0 == strcmp(argv[1], "xlnk_reset")){
+        run_xlnk_reset(argc, argv);
+    }
+#endif
 
     else if (0 == strcmp(argv[1], "go")){
         run_go(argc, argv);

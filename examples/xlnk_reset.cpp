@@ -9,6 +9,7 @@
 //#include "sds_lib.h"
 
 extern "C" {
+#include "darknet.h"
 #include "libxlnk_cma.h"
 #include <linux/ioctl.h>
 #include <errno.h>
@@ -17,7 +18,7 @@ extern "C" {
 
 #define RESET_IOCTL _IOWR('X', 101, unsigned long)
 
-void _xlnk_reset() {
+void _xlnk_reset_b() {
     /* This performs the correct ioctl but probably isn't
        particularly stable as a behaviour */
     int xlnkfd = open("/dev/xlnk", O_RDWR | O_CLOEXEC);
@@ -42,7 +43,7 @@ void xl_rst()
     printf("PAGES AVAILABLE: %u\n", pages_before);
 
     // reset all system cma buffers
-    _xlnk_reset();
+    _xlnk_reset_b();
 
     pages_reset = cma_pages_available();
     printf("PAGES AVAILABLE (RESET): %u\n", pages_reset);
@@ -51,11 +52,9 @@ void xl_rst()
 
 
 
-int main(int argc, char** argv)
+void run_xlnk_reset(int argc, char** argv)
 {
 
     xl_rst();    
 
-
-    return 0;
 }

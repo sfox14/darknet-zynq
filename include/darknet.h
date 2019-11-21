@@ -860,6 +860,10 @@ void transpose_int8(int8_t *input, int8_t *output, int dim1, int dim2);
 #ifdef FPGA
 void p_0_gemm_hw_1_noasync(int8_t * A, int arow, int8_t * B, int brow, float * C, int ccol, int acopy, 
     int batch, int ctrl, int TAw, int TAr, float ascale, float * bscale);
+// cpp examples
+void run_tbgemm(int argc, char **argv);
+void run_cma_test(int argc, char **argv);
+void run_xlnk_reset(int argc, char** argv);
 #endif
 
 

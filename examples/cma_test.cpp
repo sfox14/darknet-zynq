@@ -77,7 +77,7 @@ void xi_init(T *x, int size)
 
 }
 
-void _xlnk_reset() {
+void _xlnk_reset_a() {
     /* This performs the correct ioctl but probably isn't
        particularly stable as a behaviour */
     int xlnkfd = open("/dev/xlnk", O_RDWR | O_CLOEXEC);
@@ -118,7 +118,7 @@ void cma_test()
     }
 
     // reset all system cma buffers
-    _xlnk_reset();
+    _xlnk_reset_a();
 
     pages_reset = cma_pages_available();
     printf("PAGES AVAILABLE (RESET): %u\n", pages_reset);
@@ -134,11 +134,9 @@ void cma_test()
 
 
 
-int main(int argc, char** argv)
+void run_cma_test(int argc, char** argv)
 {
 
     cma_test();    
 
-
-    return 0;
 }
