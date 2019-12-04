@@ -31,7 +31,11 @@ void free_layer(layer l)
     if(l.bias_updates)       free(l.bias_updates);
     if(l.scales)             free(l.scales);
     if(l.scale_updates)      free(l.scale_updates);
+#ifdef FPGA    
+    if(l.weights)            zynq_free(l.weights);
+#else
     if(l.weights)            free(l.weights);
+#endif
     if(l.weight_updates)     free(l.weight_updates);
     if(l.delta)              free(l.delta);
     if(l.output)             free(l.output);
@@ -52,6 +56,14 @@ void free_layer(layer l)
     if(l.r_cpu)              free(l.r_cpu);
     if(l.h_cpu)              free(l.h_cpu);
     if(l.binary_input)       free(l.binary_input);
+
+#ifdef FPGA
+    if(l.input)              zynq_free(l.input);
+    if(l.bscale)             zynq_free(l.bscale);
+#else
+    if(l.input)              free(l.input);
+    if(l.bscale)             free(l.bscale);
+#endif
 
 #ifdef GPU
     if(l.indexes_gpu)           cuda_free((float *)l.indexes_gpu);

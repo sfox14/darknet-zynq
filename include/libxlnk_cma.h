@@ -54,3 +54,7 @@ uint32_t cma_pages_available();
  */
 void cma_flush_cache(void *buf, unsigned int phys_addr, int size);
 void cma_invalidate_cache(void *buf, unsigned int phys_addr, int size);
+
+
+void *zynq_alloc(uint32_t len, uint32_t cacheable);
+void zynq_free(void *buf);

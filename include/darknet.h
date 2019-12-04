@@ -250,6 +250,7 @@ struct layer{
     float * scale_updates;
 
 #if defined (LOWP) || defined (FPGA)
+    float * bscale;
     int8_t * weights;
     int8_t * input;
     quant * qw;
@@ -523,7 +524,7 @@ typedef struct network{
 #if defined (LOWP) || defined (FPGA)
     int8_t * af;
     int8_t * bf;
-    int * cf;
+    float * cf;
     int8_t * df;
 #endif
 

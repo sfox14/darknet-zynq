@@ -16,6 +16,8 @@ extern "C" {
 #include <dlfcn.h> 
 }
 
+#ifdef FPGA
+
 #define RESET_IOCTL _IOWR('X', 101, unsigned long)
 
 void _xlnk_reset_b() {
@@ -58,3 +60,5 @@ void run_xlnk_reset(int argc, char** argv)
     xl_rst();    
 
 }
+
+#endif

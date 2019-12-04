@@ -37,6 +37,7 @@
 #include "softmax_layer.h"
 #include "lstm_layer.h"
 #include "utils.h"
+#include "libxlnk_cma.h"
 
 typedef struct{
     char *type;
@@ -771,7 +772,7 @@ network *parse_network_cfg(char *filename)
     params.net = net;
 
     size_t workspace_size = 0;
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     //size_t data_temp_size = 0;
     size_t cf_size = 0;
     size_t af_size = 0;
@@ -866,7 +867,8 @@ network *parse_network_cfg(char *filename)
         option_unused(options);
         net->layers[count] = l;
         if (l.workspace_size > workspace_size) workspace_size = l.workspace_size;
-#ifdef LOWP
+// determine the temp net.data sizes
+#if defined (LOWP) || defined (FPGA)
         //if (l.data_temp_size > data_temp_size) data_temp_size = l.data_temp_size;
         if (l.cf_size > cf_size) cf_size = l.cf_size;
         if (l.af_size > af_size) af_size = l.af_size;
@@ -910,12 +912,17 @@ network *parse_network_cfg(char *filename)
 #endif
     }
 
-#ifdef LOWP
+#ifdef FPGA
     //if(data_temp_size) net->data_temp = calloc(1, data_temp_size);
-    if(cf_size) net->cf = calloc(1, cf_size);
-    if(af_size) net->af = calloc(1, af_size);
-    if(bf_size) net->bf = calloc(1, bf_size);
-    if(df_size) net->df = calloc(1, df_size);
+    if(cf_size) net->cf = zynq_alloc(cf_size, 4);
+    if(af_size) net->af = zynq_alloc(af_size, 1);
+    if(bf_size) net->bf = zynq_alloc(bf_size, 1);
+    if(df_size) net->df = zynq_alloc(df_size, 1);
+#elif LOWP
+    if(cf_size) net->cf = calloc(cf_size, 4);
+    if(af_size) net->af = calloc(af_size, 1);
+    if(bf_size) net->bf = calloc(bf_size, 1);
+    if(df_size) net->df = calloc(df_size, 1);
 #endif
 
 
@@ -1007,7 +1014,7 @@ void save_convolutional_weights(layer l, FILE *fp)
         fwrite(l.rolling_mean, sizeof(float), l.n, fp);
         fwrite(l.rolling_variance, sizeof(float), l.n, fp);
     }
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     fwrite(l.weights, sizeof(int8_t), num, fp);
     fwrite(l.qw, sizeof(quant), 1, fp);
 #else
@@ -1036,7 +1043,7 @@ void save_connected_weights(layer l, FILE *fp)
     }
 #endif
     fwrite(l.biases, sizeof(float), l.outputs, fp);
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     fwrite(l.weights, sizeof(int8_t), l.outputs*l.inputs, fp);
     fwrite(l.qw, sizeof(quant), 1, fp);
 #else
@@ -1145,7 +1152,7 @@ void load_connected_weights(layer l, FILE *fp, int transpose)
 {
     fread(l.biases, sizeof(float), l.outputs, fp);
 
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     fread(l.weights, sizeof(int8_t), l.outputs*l.inputs, fp);
     fread(l.qw, sizeof(quant), 1, fp);
     if(l.swa) fread(l.weights_swa, sizeof(float), l.outputs*l.inputs, fp);
@@ -1257,7 +1264,7 @@ void load_convolutional_weights(layer l, FILE *fp)
         }
     }
     
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
     fread(l.weights, sizeof(int8_t), num, fp);
     fread(l.qw, sizeof(quant), 1, fp);
     if(l.swa) fread(l.weights_swa, sizeof(float), num, fp);

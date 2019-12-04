@@ -61,27 +61,27 @@ CFLAGS+= -DCUDNN
 LDFLAGS+= -lcudnn
 endif
 
-#
-#
+
 ifeq ($(FPGA), 1)
-COMMON+= -DFPGA -DLOWP
-CFLAGS+= -DFPGA -DLOWP
+COMMON+= -DFPGA 
+CFLAGS+= -DFPGA 
 CC := aarch64-linux-gnu-gcc
 CPP := aarch64-linux-gnu-g++
 LIBS += -l pthread ./boards/RFSoC/gemm_i8f32_preload_tile_16x16_tree_4x/libgemm_i8f32_preload_tile_16x16_tree_4x.so
-LDFLAGS += -L./boards/RFSoC/gemm_i8f32_preload_tile_16x16_tree_4x/libgemm_i8f32_preload_tile_16x16_tree_4x.so
+#LDFLAGS += -L./boards/RFSoC/gemm_i8f32_preload_tile_16x16_tree_4x/libgemm_i8f32_preload_tile_16x16_tree_4x.so
 endif
 
 ifeq ($(LOWP), 1) 
 COMMON+= -DLOWP -I./gemmlowp
-CFLAGS+= -DLOWP -msse4.1
+CFLAGS+= -DLOWP 
+#CFLAGS+= -msse4.1
 CPP+= --std=c++11
 #LDFLAGS+= -lcudnn 
 endif
 
 
 
-OBJ=gemm.o utils.o cuda.o deconvolutional_layer.o convolutional_layer.o list.o image.o activations.o im2col.o col2im.o blas.o quant.o crop_layer.o dropout_layer.o maxpool_layer.o softmax_layer.o data.o matrix.o network.o connected_layer.o cost_layer.o parser.o option_list.o detection_layer.o route_layer.o upsample_layer.o box.o normalization_layer.o avgpool_layer.o layer.o local_layer.o shortcut_layer.o logistic_layer.o activation_layer.o rnn_layer.o gru_layer.o crnn_layer.o demo.o batchnorm_layer.o region_layer.o reorg_layer.o tree.o  lstm_layer.o l2norm_layer.o yolo_layer.o iseg_layer.o image_opencv.o
+OBJ=gemm.o utils.o cuda.o deconvolutional_layer.o convolutional_layer.o list.o image.o activations.o im2col.o col2im.o blas.o quant.o crop_layer.o dropout_layer.o maxpool_layer.o softmax_layer.o data.o matrix.o network.o connected_layer.o cost_layer.o parser.o option_list.o detection_layer.o route_layer.o upsample_layer.o box.o normalization_layer.o avgpool_layer.o layer.o local_layer.o shortcut_layer.o logistic_layer.o activation_layer.o rnn_layer.o gru_layer.o crnn_layer.o demo.o batchnorm_layer.o region_layer.o reorg_layer.o tree.o  lstm_layer.o l2norm_layer.o yolo_layer.o iseg_layer.o image_opencv.o zynq.o
 EXECOBJA=captcha.o lsd.o super.o art.o tag.o cifar.o go.o rnn.o segmenter.o regressor.o classifier.o coco.o yolo.o detector.o nightmare.o instance-segmenter.o anomaly.o tbgemm.o cma_test.o xlnk_reset.o darknet.o
 ifeq ($(GPU), 1) 
 LDFLAGS+= -lstdc++ 

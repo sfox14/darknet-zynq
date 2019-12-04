@@ -7,6 +7,7 @@
 #include "utils.h"
 #include "blas.h"
 #include "quant.h"
+#include "libxlnk_cma.h"
 
 #include "crop_layer.h"
 #include "connected_layer.h"
@@ -32,6 +33,7 @@
 #include "shortcut_layer.h"
 #include "parser.h"
 #include "data.h"
+
 
 load_args get_base_args(network *net)
 {
@@ -747,6 +749,19 @@ void free_network(network *net)
     free(net->layers);
     if(net->input) free(net->input);
     if(net->truth) free(net->truth);
+
+#ifdef FPGA
+    if(net->af) zynq_free(net->af);
+    if(net->bf) zynq_free(net->bf);
+    if(net->cf) zynq_free(net->cf);
+    if(net->df) zynq_free(net->df);
+#elif LOWP
+    if(net->af) free(net->af);
+    if(net->bf) free(net->bf);
+    if(net->cf) free(net->cf);
+    if(net->df) free(net->df);
+#endif
+
 #ifdef GPU
     if(net->input_gpu) cuda_free(net->input_gpu);
     if(net->truth_gpu) cuda_free(net->truth_gpu);

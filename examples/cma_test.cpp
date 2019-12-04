@@ -18,6 +18,8 @@ extern "C" {
 #include <dlfcn.h> 
 }
 
+#ifdef FPGA
+
 #define RESET_IOCTL _IOWR('X', 101, unsigned long)
 
 #define BUF_SIZE_A (16*1024*1024) // 16 Mbytes
@@ -140,3 +142,5 @@ void run_cma_test(int argc, char** argv)
     cma_test();    
 
 }
+
+#endif

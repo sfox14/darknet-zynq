@@ -14,7 +14,7 @@ Supports low precision training and inference on CPU and FPGA.
 
 ```
 make clean
-make LOWP=1
+make FPGA=1
 ```
 
 ```

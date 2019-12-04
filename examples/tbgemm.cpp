@@ -282,7 +282,7 @@ void run_tbgemm(int argc, char** argv)
 
 	/* hardware inputs and outputs */
 	Af = (data_t *) cma_alloc(int(sizeof(data_t)*max_arow*max_acol), 1);
-	Bf = (data_t *) cma_alloc(int(sizeof(data_t)*btile*max_acol*max_image), 1); // set to max_col because transpose
+	Bf = (data_t *) zynq_alloc(int(sizeof(data_t)*btile*max_acol*max_image), 1); // set to max_col because transpose
 	Cf = (float *) cma_alloc(int(sizeof(float)*max_acol*btile*max_image), 1); // set to max_col because transpose
 
 	/* init data */

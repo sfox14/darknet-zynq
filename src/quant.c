@@ -1,4 +1,4 @@
-#ifdef LOWP
+#if defined (LOWP) || defined (FPGA)
 
 #include "quant.h"
 #include <math.h>
