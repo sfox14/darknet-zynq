@@ -71,6 +71,9 @@ submission/
 backup/
 darknet
 .fuse*
+data/cifar
+data/cifar-tiny
+*.tgz
 
 # OS Generated #
 .DS_Store*
@@ -81,3 +84,4 @@ Thumbs.db
 
 # Xilinx SDSoC
 *.dat
+

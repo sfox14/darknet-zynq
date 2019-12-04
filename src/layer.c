@@ -60,7 +60,7 @@ void free_layer(layer l)
 #ifdef FPGA
     if(l.input)              zynq_free(l.input);
     if(l.bscale)             zynq_free(l.bscale);
-#else
+#elif LOWP
     if(l.input)              free(l.input);
     if(l.bscale)             free(l.bscale);
 #endif
