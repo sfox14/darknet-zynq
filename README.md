@@ -10,7 +10,7 @@ For more information see the [Darknet project website](http://pjreddie.com/darkn
 For questions or issues please use the [Google Group](https://groups.google.com/forum/#!forum/darknet).
 
 # Darknet + ZYNQ #
-Supports low precision training and inference on CPU and FPGA. 
+Supports low precision training and inference on CPU and FPGA. Open a terminal on a ZCU111 board and run: 
 
 ```
 make clean
@@ -22,3 +22,4 @@ make FPGA=1
 ./darknet anomaly test cfg/anomaly.cfg data/ad_test.bin backup/anomaly.weights
 ```
 
+The .bit and .so files can be rebuilt [here](https://github.com/sfox14/sdsoc-gemm)
