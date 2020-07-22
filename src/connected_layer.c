@@ -193,7 +193,7 @@ layer make_connected_layer(int batch, int inputs, int outputs, ACTIVATION activa
 #if defined (LOWP) || defined (FPGA)
     l.workspace_size = (l.inputs*l.outputs*4 > l.outputs*l.batch*4) ? (l.inputs*l.outputs*4) : (l.outputs*l.batch*4);
     l.cf_size = (l.outputs*l.batch*4 > l.inputs*l.outputs*4) ? (l.outputs*l.batch*4) : (l.inputs*l.outputs*4);
-    l.af_size = l.batch*l.inputs*1;
+    l.af_size = l.batch*l.inputs*l.outputs;
     l.bf_size = l.batch*l.outputs*1;
     l.df_size = l.batch*l.outputs*1;
 #else
